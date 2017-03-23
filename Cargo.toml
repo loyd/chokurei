@@ -1,0 +1,9 @@
+[package]
+name = "chokurei"
+version = "0.1.0"
+authors = [
+    "Paul Loyd <pavelko95@gmail.com>",
+    "Renat <yandzeek@gmail.com>"
+]
+
+[dependencies]
