@@ -6,4 +6,12 @@ authors = [
     "Renat <yandzeek@gmail.com>"
 ]
 
+[[bin]]
+name = "fetcher"
+path = "src/fetcher/main.rs"
+
+[[bin]]
+name = "server"
+path = "src/server/main.rs"
+
 [dependencies]

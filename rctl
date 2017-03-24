@@ -1,0 +1,65 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" != 'fetcher' ]; then
+    echo "Usage: $0 fetcher <command>"
+    exit 1
+fi
+
+: ${TARGET:=i686-unknown-linux-gnu}
+: ${CHANNEL:=stable}
+: ${FLAGS:=}
+: ${MODE:=debug}
+: ${ROLE:=chokurei}
+: ${HOST:=}
+: ${DIR:='~'}
+: ${MAIN:="$1"}
+: ${LOG_FILE:="$MAIN.log"}
+: ${RUST_LOG:="$MAIN=info"}
+: ${RUST_BACKTRACE:=1}
+: ${ENV="RUST_LOG=$RUST_LOG RUST_BACKTRACE=$RUST_BACKTRACE TZ='Europe/Moscow'"}
+
+if [ -z "$HOST" ]; then
+    echo "You should specify HOST"
+    exit 1
+fi
+
+if [ $MODE == release ]; then
+    FLAGS="--release $FLAGS"
+fi
+
+function remote {
+    ssh -t "$ROLE@$HOST" "$1"
+}
+
+STATUS_CMD="start-stop-daemon --status --chdir $DIR --exec $MAIN"
+START_CMD="$ENV start-stop-daemon --start --oknodo --no-close --background --chdir $DIR --exec $MAIN > $LOG_FILE 2>&1"
+STOP_CMD="start-stop-daemon --stop --oknodo --retry 10 --chdir $DIR --exec $MAIN"
+LOG_CMD="less -R +F $LOG_FILE"
+
+case "$2" in
+    deploy)
+        cargo +"$CHANNEL-$TARGET" build --target="$TARGET" --bin="$MAIN" $FLAGS
+        scp "target/$TARGET/$MODE/$MAIN" "$ROLE@$HOST":"$DIR"
+        ;;
+
+    status)
+        set +e
+        remote "$STATUS_CMD"
+        case "$?" in
+            0) echo "$MAIN is running" ;;
+            1|3) echo "$MAIN is not running" ;;
+            4) echo "Unable to determine status of $MAIN" ;;
+        esac
+        ;;
+
+    log) remote "$LOG_CMD" ;;
+    start) remote "$START_CMD" ;;
+    stop) remote "$STOP_CMD" ;;
+    restart) remote "$STOP_CMD && $START_CMD" ;;
+
+    *)
+        echo "Usage: "$0" "$1" {deploy|log|status|start|stop|restart}"
+        exit 1
+esac
