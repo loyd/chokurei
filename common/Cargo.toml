@@ -1,0 +1,11 @@
+[package]
+name = "common"
+version = "0.0.0"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+log = "^0.3.7"
+env_logger = "^0.4.2"
+time = "^0.1.36"

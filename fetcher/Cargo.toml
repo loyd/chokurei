@@ -1,0 +1,11 @@
+[package]
+name = "fetcher"
+version = "0.0.0"
+
+[[bin]]
+name = "fetcher"
+path = "main.rs"
+
+[dependencies]
+common = { path = "../common" }
+log = "^0.3.7"

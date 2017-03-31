@@ -40,7 +40,8 @@ LOG_CMD="less -R +F $LOG_FILE"
 
 case "$2" in
     deploy)
-        cargo +"$CHANNEL-$TARGET" build --target="$TARGET" --bin="$MAIN" $FLAGS
+        cd $MAIN
+        cargo +"$CHANNEL-$TARGET" build --target="$TARGET" $FLAGS
         scp "target/$TARGET/$MODE/$MAIN" "$ROLE@$HOST":"$DIR"
         ;;
 
