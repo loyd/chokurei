@@ -8,7 +8,7 @@ if [ "$1" != 'fetcher' ]; then
 fi
 
 : ${TARGET:=i686-unknown-linux-gnu}
-: ${CHANNEL:=stable}
+: ${CHANNEL:=nightly}
 : ${FLAGS:=}
 : ${MODE:=debug}
 : ${ROLE:=chokurei}
@@ -16,7 +16,7 @@ fi
 : ${DIR:='~'}
 : ${MAIN:="$1"}
 : ${LOG_FILE:="$MAIN.log"}
-: ${RUST_LOG:="$MAIN=info"}
+: ${RUST_LOG:=info}
 : ${RUST_BACKTRACE:=1}
 : ${ENV="RUST_LOG=$RUST_LOG RUST_BACKTRACE=$RUST_BACKTRACE TZ='Europe/Moscow'"}
 
