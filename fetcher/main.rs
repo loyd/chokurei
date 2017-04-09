@@ -8,6 +8,7 @@ extern crate tokio_core;
 extern crate tokio_request;
 extern crate rss;
 extern crate url;
+extern crate kuchiki;
 
 use tokio_core::reactor::Core;
 use url::Url;
@@ -26,5 +27,13 @@ fn main() {
 
     let data = lp.run(request).unwrap();
 
-    info!("{:?}", data);
+    info!("Visit {}", data.link);
+
+    let url = Url::parse(&data.link).unwrap();
+
+    let request = download::document(&lp, &url);
+
+    let data = lp.run(request).unwrap();
+
+    info!("{}", data.to_string());
 }
