@@ -10,3 +10,6 @@ path = "lib.rs"
 log = "^0.3.7"
 env_logger = "^0.4.2"
 time = "^0.1.36"
+uuid = "^0.4"
+diesel = { version = "^0.12", features = ["postgres", "deprecated-time", "uuid"] }
+diesel_codegen = { version = "^0.12", features = ["postgres"] }
