@@ -10,3 +10,8 @@ path = "main.rs"
 [dependencies]
 common = { path = "../common" }
 log = "^0.3.7"
+futures = "^0.1.11"
+tokio-core = "^0.1.6"
+tokio-request = { git = "https://github.com/NeoLegends/tokio-request" }
+rss = "^0.4"
+url = "^1.4"
