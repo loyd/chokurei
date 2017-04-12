@@ -1,10 +1,12 @@
 use time::Timespec;
 use uuid::Uuid;
 
+use key::Key;
+
 #[derive(Debug, Queryable)]
 pub struct Feed {
     pub id: i32,
-    pub key: String,
+    pub key: Key,
     pub url: String,
     pub title: Option<String>,
     pub website: Option<String>,
@@ -17,7 +19,7 @@ pub struct Feed {
 #[derive(Debug, Queryable)]
 pub struct Entry {
     pub id: i64,
-    pub key: String,
+    pub key: Key,
     pub feed_id: i32,
     pub url: Option<String>,
     pub title: Option<String>,

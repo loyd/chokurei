@@ -6,7 +6,9 @@ extern crate uuid;
 extern crate diesel;
 #[macro_use]
 extern crate diesel_codegen;
+extern crate url;
 
 pub mod logger;
 pub mod schema;
 pub mod models;
+pub mod key;
