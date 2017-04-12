@@ -21,13 +21,11 @@ impl From<Url> for Key {
     fn from(url: Url) -> Key {
         let host = url.host_str().map(|host| host.trim_left_matches("www."));
         let port = url.port();
-        let path = url.path().trim_right_matches("/");
-        let path = if path.contains("//") {
-            // FIXME(loyd): "////" -> "//"
-            path.replace("//", "/").to_lowercase()
-        } else {
-            path.to_lowercase()
-        };
+        let mut path = url.path().trim_right_matches("/").to_lowercase();
+
+        while path.contains("//") {
+            path = path.replace("//", "/");
+        }
 
         let mut value = String::with_capacity(host.map_or(0, |h| h.len())
                                               + if port.is_some() { 6 } else { 0 }
@@ -115,6 +113,11 @@ fn it_removes_www() {
 #[test]
 fn it_resolves_pathes() {
     test!("https://example.com/test//foo.html", "example.com/test/foo.html");
+}
+
+#[test]
+fn it_remove_multiple_slashes() {
+    test!("http://example.com/one//two///three////four", "example.com/one/two/three/four");
 }
 
 #[test]
