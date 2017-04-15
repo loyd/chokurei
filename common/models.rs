@@ -13,7 +13,8 @@ pub struct Feed {
     pub description: Option<String>,
     pub language: Option<String>,
     pub copyright: Option<String>,
-    pub interval: Option<i32>
+    pub interval: Option<i32>,
+    pub augmented: Option<Timespec>
 }
 
 #[derive(Debug, Queryable)]
