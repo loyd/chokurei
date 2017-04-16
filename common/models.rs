@@ -9,9 +9,9 @@ pub struct Feed {
     pub key: Key,
     pub url: String,
     pub title: Option<String>,
-    pub website: Option<String>,
     pub description: Option<String>,
     pub language: Option<String>,
+    pub logo: Option<String>,
     pub copyright: Option<String>,
     pub interval: Option<i32>,
     pub augmented: Option<Timespec>
