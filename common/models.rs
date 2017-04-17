@@ -1,17 +1,19 @@
 use time::Timespec;
 use uuid::Uuid;
 
-use key::Key;
+use schema::{feed, entry};
+use types::{Url, Key};
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, AsChangeset)]
+#[table_name="feed"]
 pub struct Feed {
     pub id: i32,
     pub key: Key,
-    pub url: String,
+    pub url: Url,
     pub title: Option<String>,
     pub description: Option<String>,
     pub language: Option<String>,
-    pub logo: Option<String>,
+    pub logo: Option<Url>,
     pub copyright: Option<String>,
     pub interval: Option<i32>,
     pub augmented: Option<Timespec>
@@ -22,7 +24,7 @@ pub struct Entry {
     pub id: i64,
     pub key: Key,
     pub feed_id: i32,
-    pub url: Option<String>,
+    pub url: Option<Url>,
     pub title: Option<String>,
     pub author: Option<String>,
     pub description: Option<String>,
