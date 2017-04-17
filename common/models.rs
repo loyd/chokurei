@@ -19,9 +19,29 @@ pub struct Feed {
     pub augmented: Option<Timespec>
 }
 
+#[derive(Debug, Insertable)]
+#[table_name="feed"]
+pub struct NewFeed {
+    pub key: Key,
+    pub url: Url
+}
+
 #[derive(Debug, Queryable)]
 pub struct Entry {
     pub id: i64,
+    pub key: Key,
+    pub feed_id: i32,
+    pub url: Option<Url>,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub description: Option<String>,
+    pub content: Option<String>,
+    pub published: Option<Timespec>
+}
+
+#[derive(Debug, Insertable)]
+#[table_name="entry"]
+pub struct NewEntry {
     pub key: Key,
     pub feed_id: i32,
     pub url: Option<Url>,

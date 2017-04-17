@@ -14,5 +14,6 @@ futures = "^0.1.11"
 tokio-core = "^0.1.6"
 tokio-request = { git = "https://github.com/NeoLegends/tokio-request" }
 rss = "^0.4"
-url = "^1.4"
 kuchiki = "^0.4.1"
+time = "^0.1.36"
+mailparse = "^0.5.1"
