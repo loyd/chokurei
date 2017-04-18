@@ -97,6 +97,7 @@ fn purify_text(string: String) -> Option<String> {
 
 fn unify_language(mut language: String) -> Option<String> {
     if !language.is_ascii() {
+        warn!("Cannot convert \"{}\" to a language code: not ascii", language);
         return None;
     }
 
@@ -106,6 +107,7 @@ fn unify_language(mut language: String) -> Option<String> {
     } else if language.len() > 2 {
         Some(language.trim()[..2].to_lowercase())
     } else {
+        warn!("Cannot convert \"{}\" to a language code", language);
         None
     }
 }
