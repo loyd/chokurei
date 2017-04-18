@@ -12,6 +12,7 @@ extern crate mailparse;
 extern crate time;
 extern crate uuid;
 
+use std::cmp;
 use std::ascii::AsciiExt;
 use std::io::Error as IoError;
 
@@ -29,6 +30,25 @@ use scheduler::Scheduler;
 
 mod scheduler;
 mod download;
+
+const MIN_INTERVAL: u32 = 3600;
+const MAX_INTERVAL: u32 = 24 * 3600;
+const PROMPTNESS: f32 = 0.5;
+
+fn estimate_interval(prev: u32, total: u32, new: u32) -> u32 {
+    if total == 0 {
+        return cmp::min(prev + MIN_INTERVAL, MAX_INTERVAL);
+    }
+
+    let staleness = (total - new) as f32 / total as f32;
+    let delta = staleness - PROMPTNESS;
+    let estimated = prev as f32 * (1. + delta / PROMPTNESS);
+    let trust = (total as f32 / 30.).min(1.);
+
+    let next = prev as f32 * (1. - trust) + estimated * trust;
+
+    cmp::max(MIN_INTERVAL, cmp::min(next as u32, MAX_INTERVAL))
+}
 
 fn retrieve_feeds() -> Vec<Feed> {
     // TODO(loyd): fetch feeds from the database.
@@ -126,13 +146,19 @@ fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>
 
     let augmented = feed.augmented.unwrap_or(Timespec::new(0, 0));
 
+    let (mut total_count, mut new_count) = (0, 0);
+
     let entries = channel.items.into_iter().filter_map(|item| {
         let published = item.pub_date.and_then(|date| parse_rfc822_date(&date));
 
         if let Some(published) = published {
+            total_count += 1;
+
             if published <= augmented {
                 return None;
             }
+
+            new_count += 1;
         }
 
         let url = item.link.and_then(|url| parse_url(&url));
@@ -156,6 +182,9 @@ fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>
             content: item.content.and_then(purify_text)
         })
     }).collect();
+
+    let prev_interval = feed.interval.unwrap() as u32;
+    feed.interval = Some(estimate_interval(prev_interval, total_count, new_count) as i32);
 
     (feed, entries)
 }
@@ -192,9 +221,9 @@ fn main() {
     let (scheduler, feeds) = Scheduler::new();
 
     for mut feed in retrieve_feeds() {
-        feed.interval = feed.interval.or(Some(30));
+        feed.interval = feed.interval.or(Some(0));
 
-        scheduler.schedule(feed.interval.unwrap() as u64 * 1000, feed);
+        scheduler.schedule((feed.interval.unwrap() * 1000) as u64, feed);
     }
 
     let mut lp = Core::new().unwrap();
@@ -210,7 +239,6 @@ fn main() {
                 feed.augmented = Some(augmented);
             }
 
-            // TODO(loyd): correct the interval.
             // TODO(loyd): save the feed and entries to the database.
 
             scheduler.schedule((feed.interval.unwrap() * 1000) as u64, feed);
@@ -219,4 +247,22 @@ fn main() {
         });
 
     lp.run(process).unwrap();
+}
+
+#[test]
+fn it_estimates_interval() {
+    assert_eq!(estimate_interval(MIN_INTERVAL, 30, 0), (MIN_INTERVAL as f32 / PROMPTNESS) as u32);
+
+    // Keypoints.
+    let some_prev = MIN_INTERVAL + 2048;
+    assert_eq!(estimate_interval(some_prev, 10000, ((1. - PROMPTNESS) * 10000.) as u32), some_prev);
+    assert_eq!(estimate_interval(MIN_INTERVAL, 30, 30), MIN_INTERVAL);
+    assert_eq!(estimate_interval(MIN_INTERVAL, 1, 1), MIN_INTERVAL);
+    assert_eq!(estimate_interval(MAX_INTERVAL, 30, 0), MAX_INTERVAL);
+    assert_eq!(estimate_interval(MAX_INTERVAL, 1, 0), MAX_INTERVAL);
+    assert_eq!(estimate_interval(MIN_INTERVAL + 42, 0, 0), 2 * MIN_INTERVAL + 42);
+    assert_eq!(estimate_interval(0, 30, 30), MIN_INTERVAL);
+    assert_eq!(estimate_interval(0, 30, 0), MIN_INTERVAL);
+    assert_eq!(estimate_interval(0, 1, 0), MIN_INTERVAL);
+    assert_eq!(estimate_interval(0, 0, 0), MIN_INTERVAL);
 }
