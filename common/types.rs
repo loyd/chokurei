@@ -7,6 +7,7 @@ use diesel::expression::AsExpression;
 use diesel::pg::Pg;
 use diesel::row::Row;
 use diesel::expression::helper_types::AsExprOf;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Url(url::Url);
@@ -89,6 +90,12 @@ impl From<Url> for Key {
         value.push_str(&path);
 
         Key(value)
+    }
+}
+
+impl From<Uuid> for Key {
+    fn from(uuid: Uuid) -> Key {
+        Key(uuid.simple().to_string())
     }
 }
 

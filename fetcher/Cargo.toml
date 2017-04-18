@@ -17,3 +17,4 @@ rss = "^0.4"
 kuchiki = "^0.4.1"
 time = "^0.1.36"
 mailparse = "^0.5.1"
+uuid = { version = "^0.4", features = ["v5"] }

@@ -10,6 +10,7 @@ extern crate rss;
 extern crate kuchiki;
 extern crate mailparse;
 extern crate time;
+extern crate uuid;
 
 use std::ascii::AsciiExt;
 use std::io::Error as IoError;
@@ -19,10 +20,9 @@ use tokio_core::reactor::{Core, Handle};
 use futures::future;
 use futures::{Future, Stream};
 use rss::Channel;
-use kuchiki::NodeRef;
+use uuid::{Uuid, NAMESPACE_X500};
 
 use common::logger;
-use common::schema;
 use common::models::{Feed, NewEntry};
 use common::types::{Url, Key};
 use scheduler::Scheduler;
@@ -137,8 +137,13 @@ fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>
 
         let url = item.link.and_then(|url| parse_url(&url));
 
-        // FIXME(loyd): get rid of `unwrap`.
-        let key = Key::from(url.clone().unwrap());
+        let key = if let Some(ref url) = url {
+            Key::from(url.clone())
+        } else if let Some(ref title) = item.title {
+            Key::from(Uuid::new_v5(&NAMESPACE_X500, title))
+        } else {
+            return None;
+        };
 
         Some(NewEntry {
             key,
