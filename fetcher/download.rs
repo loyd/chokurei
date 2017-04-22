@@ -12,6 +12,8 @@ use common::types::Url;
 const USER_AGENT: &str = "Mozilla/5.0 (compatible; chokurei)";
 
 // TODO(loyd): share a session between requests.
+// TODO(loyd): what about redirects?
+// TODO(loyd): check http code of responses.
 
 pub fn channel(handle: &Handle, url: &Url) -> impl Future<Item=Channel, Error=IoError> + 'static {
     get(url.as_ref())

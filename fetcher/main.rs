@@ -11,6 +11,7 @@ extern crate kuchiki;
 extern crate mailparse;
 extern crate time;
 extern crate uuid;
+extern crate diesel;
 
 use std::cmp;
 use std::ascii::AsciiExt;
@@ -22,9 +23,11 @@ use futures::future;
 use futures::{Future, Stream};
 use rss::Channel;
 use uuid::{Uuid, NAMESPACE_X500};
+use diesel::prelude::*;
 
 use common::logger;
 use common::models::{Feed, NewEntry};
+use common::schema::{self, feed};
 use common::types::{Url, Key};
 use scheduler::Scheduler;
 
@@ -48,37 +51,6 @@ fn estimate_interval(prev: u32, total: u32, new: u32) -> u32 {
     let next = prev as f32 * (1. - trust) + estimated * trust;
 
     cmp::max(MIN_INTERVAL, cmp::min(next as u32, MAX_INTERVAL))
-}
-
-fn retrieve_feeds() -> Vec<Feed> {
-    // TODO(loyd): fetch feeds from the database.
-
-    let url1 = Url::parse("http://habrahabr.ru/rss/hub/c/").unwrap();
-    let url2 = Url::parse("http://habrahabr.ru/rss/hub/rust/").unwrap();
-
-    vec![Feed {
-        id: 0,
-        key: Key::from(url1.clone()),
-        url: url1,
-        title: None,
-        description: None,
-        language: None,
-        logo: None,
-        copyright: None,
-        interval: None,
-        augmented: None
-    }, Feed {
-        id: 0,
-        key: Key::from(url2.clone()),
-        url: url2,
-        title: None,
-        description: None,
-        language: None,
-        logo: None,
-        copyright: None,
-        interval: Some(60),
-        augmented: None
-    }]
 }
 
 fn purify_text(string: String) -> Option<String> {
@@ -135,6 +107,8 @@ fn parse_url(url: &str) -> Option<Url> {
 fn fetch_entries(handle: &Handle, feed: Feed)
     -> impl Future<Item=(Feed, Vec<NewEntry>), Error=IoError>
 {
+    info!("Fetching {} feed...", feed.key);
+
     download::channel(handle, &feed.url).map(|channel| disassemble_channel(feed, channel))
 }
 
@@ -185,7 +159,7 @@ fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>
         })
     }).collect();
 
-    let prev_interval = feed.interval.unwrap() as u32;
+    let prev_interval = feed.interval.unwrap_or(0) as u32;
     feed.interval = Some(estimate_interval(prev_interval, total_count, new_count) as i32);
 
     (feed, entries)
@@ -198,6 +172,8 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
 
     // TODO(loyd): ignore fails.
     let fetchers = entries.into_iter().map(|mut entry| {
+        debug!("  Fetching {} entry...", entry.key);
+
         if entry.url.is_none() {
             return Box::new(future::ok(entry)) as BoxFuture;
         }
@@ -220,28 +196,42 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
 fn main() {
     logger::init().unwrap();
 
-    let (scheduler, feeds) = Scheduler::new();
+    let conn = schema::establish_connection().unwrap();
 
-    for mut feed in retrieve_feeds() {
-        feed.interval = feed.interval.or(Some(0));
+    let (scheduler, feed_stream) = Scheduler::new();
 
-        scheduler.schedule((feed.interval.unwrap() * 1000) as u64, feed);
+    info!("Loading feeds...");
+
+    let initial_feeds = feed::table.load::<Feed>(&conn).unwrap();
+
+    info!("Scheduling initial {} feeds...", initial_feeds.len());
+
+    for feed in initial_feeds {
+        let timeout = feed.interval.unwrap_or(0);
+
+        debug!("  Scheduled {} after {}s", feed.key, timeout);
+
+        scheduler.schedule((timeout * 1000) as u64, feed);
     }
+
+    info!("Running the reactor...");
 
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
 
-    let process = feeds
+    let process = feed_stream
         .then(|feed| fetch_entries(&handle, feed.unwrap()))
         .and_then(|(feed, entries)| fetch_documents(&handle, feed, entries))
         .for_each(|(mut feed, entries)| {
-            info!("Visited {} and collected {} new entries", feed.url, entries.len());
+            info!("Visited {} and collected {} new entries", feed.key, entries.len());
 
             if let Some(augmented) = entries.iter().filter_map(|entry| entry.published).max() {
                 feed.augmented = Some(augmented);
             }
 
             // TODO(loyd): save the feed and entries to the database.
+
+            debug!("  Scheduled after {}s", feed.interval.unwrap());
 
             scheduler.schedule((feed.interval.unwrap() * 1000) as u64, feed);
 
