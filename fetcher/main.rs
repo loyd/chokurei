@@ -7,11 +7,11 @@ extern crate futures;
 extern crate tokio_core;
 extern crate tokio_request;
 extern crate rss;
-extern crate kuchiki;
 extern crate mailparse;
 extern crate time;
 extern crate uuid;
 extern crate diesel;
+extern crate readability;
 
 use std::cmp;
 use std::ascii::AsciiExt;
@@ -30,6 +30,7 @@ use common::models::{Feed, NewEntry};
 use common::schema::{self, feed};
 use common::types::{Url, Key};
 use scheduler::Scheduler;
+use readability::Readability;
 
 mod scheduler;
 mod download;
@@ -181,9 +182,10 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
         let fetcher = download::document(handle, entry.url.as_ref().unwrap());
 
         let future = fetcher.map(|document| {
-            // TODO(loyd): use `readability.rs`, Luke!
+            let content = Readability::new().parse(&document).to_string();
+
             // TODO(loyd): leave original `content` in some situations.
-            entry.content = Some(document.to_string());
+            entry.content = Some(content);
             entry
         });
 

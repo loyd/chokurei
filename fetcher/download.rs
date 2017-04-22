@@ -4,8 +4,6 @@ use futures::Future;
 use tokio_core::reactor::Handle;
 use tokio_request::str::get;
 use rss::Channel;
-use kuchiki::{self, NodeRef};
-use kuchiki::traits::TendrilSink;
 
 use common::types::Url;
 
@@ -25,13 +23,14 @@ pub fn channel(handle: &Handle, url: &Url) -> impl Future<Item=Channel, Error=Io
         )
 }
 
-pub fn document(handle: &Handle, url: &Url) -> impl Future<Item=NodeRef, Error=IoError> + 'static {
+pub fn document(handle: &Handle, url: &Url) -> impl Future<Item=String, Error=IoError> + 'static {
     get(url.as_ref())
         .header("User-Agent", USER_AGENT)
         .send(handle.clone())
-        .and_then(|res|
-            str::from_utf8(res.body())
-                .map(|body| kuchiki::parse_html().one(body))
+        .and_then(|response| {
+            let buffer = Vec::from(response);
+
+            String::from_utf8(buffer)
                 .map_err(|cause| IoError::new(IoErrorKind::InvalidData, cause))
-        )
+        })
 }
