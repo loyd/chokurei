@@ -4,7 +4,7 @@ use uuid::Uuid;
 use schema::{feed, entry};
 use types::{Url, Key};
 
-#[derive(Debug, Queryable, AsChangeset)]
+#[derive(Debug, Queryable, Identifiable, AsChangeset)]
 #[table_name="feed"]
 pub struct Feed {
     pub id: i32,

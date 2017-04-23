@@ -1,11 +1,12 @@
 use std::fmt;
+use std::io::Write;
 use std::error::Error;
 
 use url;
-use diesel::types::{Text, Nullable, FromSqlRow};
-use diesel::expression::AsExpression;
-use diesel::pg::Pg;
 use diesel::row::Row;
+use diesel::backend::Backend;
+use diesel::types::{Text, Nullable, IsNull, FromSqlRow, ToSql};
+use diesel::expression::AsExpression;
 use diesel::expression::helper_types::AsExprOf;
 use uuid::Uuid;
 
@@ -18,8 +19,10 @@ impl Url {
     }
 }
 
-impl FromSqlRow<Text, Pg> for Url {
-    fn build_from_row<R: Row<Pg>>(row: &mut R) -> Result<Url, Box<Error + Send + Sync>> {
+impl<DB> FromSqlRow<Text, DB> for Url
+    where DB: Backend<RawValue=[u8]>
+{
+    fn build_from_row<R: Row<DB>>(row: &mut R) -> Result<Url, Box<Error + Send + Sync>> {
         let string = String::build_from_row(row)?;
 
         url::Url::parse(&string).map(Url).map_err(From::from)
@@ -57,6 +60,15 @@ impl<'a> AsExpression<Text> for &'a Url {
 
     fn as_expression(self) -> Self::Expression {
         AsExpression::<Text>::as_expression(self.0.as_str().to_owned())
+    }
+}
+
+impl<DB> ToSql<Text, DB> for Url
+    where DB: Backend,
+          for<'a> &'a str: ToSql<Text, DB>
+{
+    fn to_sql<W: Write>(&self, out: &mut W) -> Result<IsNull, Box<Error + Send + Sync>> {
+        self.0.as_str().to_sql(out)
     }
 }
 
@@ -99,8 +111,10 @@ impl From<Uuid> for Key {
     }
 }
 
-impl FromSqlRow<Text, Pg> for Key {
-    fn build_from_row<R: Row<Pg>>(row: &mut R) -> Result<Key, Box<Error + Send + Sync>> {
+impl<DB> FromSqlRow<Text, DB> for Key
+    where DB: Backend<RawValue=[u8]>
+{
+    fn build_from_row<R: Row<DB>>(row: &mut R) -> Result<Key, Box<Error + Send + Sync>> {
         String::build_from_row(row).map(Key)
     }
 }
