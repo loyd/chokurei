@@ -170,33 +170,45 @@ fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>
 fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
     -> impl Future<Item=(Feed, Vec<NewEntry>), Error=IoError> + 'static
 {
-    type BoxFuture = Box<Future<Item=NewEntry, Error=IoError>>;
+    type BoxFuture = Box<Future<Item=Option<NewEntry>, Error=IoError>>;
 
-    // TODO(loyd): ignore fails.
     let fetchers = entries.into_iter().map(|mut entry| {
         debug!("  Fetching {} entry...", entry.key);
 
         if entry.url.is_none() {
-            return Box::new(future::ok(entry)) as BoxFuture;
+            return Box::new(future::ok(Some(entry))) as BoxFuture;
         }
 
         let fetcher = download::document(handle, entry.url.as_ref().unwrap());
 
-        let future = fetcher.map(|document| {
+        let future = fetcher.then(|result| {
+            let document = match result {
+                Ok(document) => document,
+                Err(error) => {
+                    error!("Fetching {} is failed: {}", entry.key, error);
+                    return Ok(None);
+                }
+            };
+
+            // TODO(loyd): should we use a thread pool here?
             let content = Readability::new().parse(&document).to_string();
 
             // TODO(loyd): leave original `content` in some situations.
             entry.content = Some(content);
-            entry
+            Ok(Some(entry))
         });
 
         Box::new(future) as BoxFuture
     }).collect::<Vec<_>>();
 
-    future::join_all(fetchers).map(|entries| (feed, entries))
+    future::join_all(fetchers).map(|entries| {
+        let entries = entries.into_iter().filter_map(|entry| entry).collect();
+        (feed, entries)
+    })
 }
 
 fn save_entries(connection: &PgConnection, feed: &Feed, entries: &[NewEntry]) -> QueryResult<bool> {
+    // TODO(loyd): should we use a connection pool here?
     connection.transaction(|| {
         let active = diesel::update(feed)
             .set(feed)
