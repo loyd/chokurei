@@ -24,10 +24,11 @@ use futures::{Future, Stream};
 use rss::Channel;
 use uuid::{Uuid, NAMESPACE_X500};
 use diesel::prelude::*;
+use diesel::pg::PgConnection;
 
 use common::logger;
 use common::models::{Feed, NewEntry};
-use common::schema::{self, feed};
+use common::schema;
 use common::types::{Url, Key};
 use scheduler::Scheduler;
 use readability::Readability;
@@ -195,16 +196,30 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
     future::join_all(fetchers).map(|entries| (feed, entries))
 }
 
+fn save_entries(connection: &PgConnection, feed: &Feed, entries: &[NewEntry]) -> QueryResult<bool> {
+    connection.transaction(|| {
+        let active = diesel::update(feed)
+            .set(feed)
+            .execute(connection)? > 0;
+
+        diesel::insert(entries)
+            .into(schema::entry::table)
+            .execute(connection)?;
+
+        Ok(active)
+    })
+}
+
 fn main() {
     logger::init().unwrap();
 
-    let conn = schema::establish_connection().unwrap();
+    let connection = schema::establish_connection().unwrap();
 
     let (scheduler, feed_stream) = Scheduler::new();
 
     info!("Loading feeds...");
 
-    let initial_feeds = feed::table.load::<Feed>(&conn).unwrap();
+    let initial_feeds = schema::feed::table.load::<Feed>(&connection).unwrap();
 
     info!("Scheduling initial {} feeds...", initial_feeds.len());
 
@@ -231,11 +246,11 @@ fn main() {
                 feed.augmented = Some(augmented);
             }
 
-            // TODO(loyd): save the feed and entries to the database.
+            if save_entries(&connection, &feed, &entries).unwrap() {
+                debug!("  Scheduled after {}s", feed.interval.unwrap());
 
-            debug!("  Scheduled after {}s", feed.interval.unwrap());
-
-            scheduler.schedule((feed.interval.unwrap() * 1000) as u64, feed);
+                scheduler.schedule((feed.interval.unwrap() * 1000) as u64, feed);
+            }
 
             Ok(())
         });
