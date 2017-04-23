@@ -15,6 +15,7 @@ use url::Url;
 
 use common::logger;
 
+mod scheduler;
 mod download;
 
 fn main() {
