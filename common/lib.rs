@@ -10,5 +10,5 @@ extern crate url;
 
 pub mod logger;
 pub mod schema;
+pub mod types;
 pub mod models;
-pub mod key;
