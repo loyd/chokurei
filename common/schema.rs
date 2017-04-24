@@ -5,7 +5,13 @@ use diesel::pg::PgConnection;
 const DATABASE_URL: &str = "postgres://localhost/chokurei";
 
 pub fn establish_connection() -> ConnectionResult<PgConnection> {
-    PgConnection::establish(DATABASE_URL)
+    let connection = PgConnection::establish(DATABASE_URL)?;
+
+    if cfg!(not(feature = "commit-transaction")) {
+        connection.begin_test_transaction().unwrap();
+    }
+
+    Ok(connection)
 }
 
 table! {

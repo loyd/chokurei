@@ -9,7 +9,7 @@ fi
 
 : ${TARGET:=i686-unknown-linux-gnu}
 : ${CHANNEL:=nightly}
-: ${FLAGS:=}
+: ${FLAGS:=--features=commit-transaction}
 : ${MODE:=debug}
 : ${ROLE:=chokurei}
 : ${HOST:=}

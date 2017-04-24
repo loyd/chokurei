@@ -6,6 +6,9 @@ publish = false
 [lib]
 path = "lib.rs"
 
+[features]
+commit-transaction = []
+
 [dependencies]
 log = "^0.3.7"
 env_logger = "^0.4.2"
