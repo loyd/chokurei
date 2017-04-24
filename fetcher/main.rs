@@ -7,10 +7,13 @@ extern crate futures;
 extern crate tokio_core;
 extern crate tokio_request;
 extern crate rss;
-extern crate mailparse;
 extern crate time;
+extern crate mailparse;
 extern crate uuid;
+#[macro_use]
 extern crate diesel;
+#[macro_use]
+extern crate diesel_codegen;
 extern crate readability;
 
 use std::cmp;
@@ -27,14 +30,15 @@ use diesel::prelude::*;
 use diesel::pg::PgConnection;
 
 use common::logger;
-use common::models::{Feed, NewEntry};
 use common::schema;
 use common::types::{Url, Key};
+use models::{Feed, NewEntry};
 use scheduler::Scheduler;
 use readability::Readability;
 
 mod scheduler;
 mod download;
+mod models;
 
 const MIN_INTERVAL: u32 = 3600;
 const MAX_INTERVAL: u32 = 24 * 3600;

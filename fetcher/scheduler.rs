@@ -25,6 +25,7 @@ impl<T: Send + 'static> Scheduler<T> {
     }
 }
 
+#[derive(Debug)]
 struct Unit<T>(i64, T);
 
 impl<T> Unit<T> {

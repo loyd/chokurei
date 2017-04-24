@@ -16,4 +16,3 @@ time = "^0.1.36"
 uuid = "^0.4"
 url = "^1.4"
 diesel = { version = "^0.12", features = ["postgres", "deprecated-time", "uuid", "unstable"] }
-diesel_codegen = { version = "^0.12", features = ["postgres"] }
