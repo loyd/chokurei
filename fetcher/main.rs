@@ -119,7 +119,7 @@ fn fetch_entries(handle: &Handle, feed: Feed)
 }
 
 fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>) {
-    // TODO(loyd): use `channel.ttl` as some assumption about `feed.interval`.
+    // TODO: use `channel.ttl` as some assumption about `feed.interval`.
     feed.title = purify_text(channel.title);
     feed.description = purify_text(channel.description);
     feed.language = channel.language.and_then(unify_language);
@@ -174,18 +174,16 @@ fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>
 fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
     -> impl Future<Item=(Feed, Vec<NewEntry>), Error=IoError> + 'static
 {
-    type BoxFuture = Box<Future<Item=Option<NewEntry>, Error=IoError>>;
-
     let fetchers = entries.into_iter().map(|mut entry| {
         debug!("  Fetching {} entry...", entry.key);
 
         if entry.url.is_none() {
-            return Box::new(future::ok(Some(entry))) as BoxFuture;
+            return future::ok(Some(entry)).boxed();
         }
 
-        let fetcher = download::document(handle, entry.url.as_ref().unwrap());
+        let download = download::document(handle, entry.url.as_ref().unwrap());
 
-        let future = fetcher.then(|result| {
+        download.then(|result| {
             let document = match result {
                 Ok(document) => document,
                 Err(error) => {
@@ -194,15 +192,13 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
                 }
             };
 
-            // TODO(loyd): should we use a thread pool here?
+            // TODO: should we use a thread pool here?
             let content = Readability::new().parse(&document).to_string();
 
-            // TODO(loyd): leave original `content` in some situations.
+            // TODO: leave original `content` in some situations.
             entry.content = Some(content);
             Ok(Some(entry))
-        });
-
-        Box::new(future) as BoxFuture
+        }).boxed()
     }).collect::<Vec<_>>();
 
     future::join_all(fetchers).map(|entries| {
@@ -212,7 +208,7 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
 }
 
 fn save_entries(connection: &PgConnection, feed: &Feed, entries: &[NewEntry]) -> QueryResult<bool> {
-    // TODO(loyd): should we use a connection pool here?
+    // TODO: should we use a connection pool here?
     connection.transaction(|| {
         let active = diesel::update(feed)
             .set(feed)
@@ -253,6 +249,7 @@ fn main() {
     let handle = lp.handle();
 
     let process = feed_stream
+        // TODO: should we fetch feeds concurrently?
         .then(|feed| fetch_entries(&handle, feed.unwrap()))
         .and_then(|(feed, entries)| fetch_documents(&handle, feed, entries))
         .for_each(|(mut feed, entries)| {
