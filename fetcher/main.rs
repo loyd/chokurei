@@ -18,7 +18,6 @@ extern crate readability;
 
 use std::cmp;
 use std::ascii::AsciiExt;
-use std::io::Error as IoError;
 
 use time::Timespec;
 use tokio_core::reactor::{Core, Handle};
@@ -93,8 +92,8 @@ fn unify_language(mut language: String) -> Option<String> {
 fn parse_rfc822_date(date: &str) -> Option<Timespec> {
     match mailparse::dateparse(date) {
         Ok(date) => Some(Timespec::new(date, 0)),
-        Err(err) => {
-            warn!("Cannot parse \"{}\" as date: {}", date, err);
+        Err(error) => {
+            warn!("Cannot parse \"{}\" as date: {}", date, error);
             None
         }
     }
@@ -110,12 +109,24 @@ fn parse_url(url: &str) -> Option<Url> {
     }
 }
 
-fn fetch_entries(handle: &Handle, feed: Feed)
-    -> impl Future<Item=(Feed, Vec<NewEntry>), Error=IoError>
+fn fetch_entries(handle: &Handle, mut feed: Feed)
+    -> impl Future<Item=(Feed, Vec<NewEntry>), Error=()>
 {
     info!("Fetching {} feed...", feed.key);
 
-    download::channel(handle, &feed.url).map(|channel| disassemble_channel(feed, channel))
+    download::channel(handle, &feed.url).then(|channel| {
+        Ok(match channel {
+            Ok(channel) => disassemble_channel(feed, channel),
+            Err(error) => {
+                warn!("Fetching {} is failed: {}", feed.key, error);
+
+                let interval = estimate_interval(feed.interval.unwrap() as u32, 0, 0);
+                feed.interval = Some(interval as i32);
+
+                (feed, Vec::new())
+            }
+        })
+    })
 }
 
 fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>) {
@@ -165,14 +176,14 @@ fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>
         })
     }).collect();
 
-    let prev_interval = feed.interval.unwrap_or(0) as u32;
-    feed.interval = Some(estimate_interval(prev_interval, total_count, new_count) as i32);
+    let interval = estimate_interval(feed.interval.unwrap() as u32, total_count, new_count);
+    feed.interval = Some(interval as i32);
 
     (feed, entries)
 }
 
 fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
-    -> impl Future<Item=(Feed, Vec<NewEntry>), Error=IoError> + 'static
+    -> impl Future<Item=(Feed, Vec<NewEntry>), Error=()> + 'static
 {
     let fetchers = entries.into_iter().map(|mut entry| {
         debug!("  Fetching {} entry...", entry.key);
@@ -187,7 +198,7 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
             let document = match result {
                 Ok(document) => document,
                 Err(error) => {
-                    error!("Fetching {} is failed: {}", entry.key, error);
+                    warn!("Fetching {} is failed: {}", entry.key, error);
                     return Ok(None);
                 }
             };
@@ -235,8 +246,9 @@ fn main() {
 
     info!("Scheduling initial {} feeds...", initial_feeds.len());
 
-    for feed in initial_feeds {
+    for mut feed in initial_feeds {
         let timeout = feed.interval.unwrap_or(0);
+        feed.interval = Some(timeout);
 
         debug!("  Scheduled {} after {}s", feed.key, timeout);
 
@@ -250,7 +262,7 @@ fn main() {
 
     let process = feed_stream
         // TODO: should we fetch feeds concurrently?
-        .then(|feed| fetch_entries(&handle, feed.unwrap()))
+        .and_then(|feed| fetch_entries(&handle, feed))
         .and_then(|(feed, entries)| fetch_documents(&handle, feed, entries))
         .for_each(|(mut feed, entries)| {
             info!("Visited {} and collected {} new entries", feed.key, entries.len());
