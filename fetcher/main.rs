@@ -9,36 +9,33 @@ extern crate tokio_request;
 extern crate rss;
 extern crate time;
 extern crate mailparse;
-extern crate uuid;
-#[macro_use]
-extern crate diesel;
-#[macro_use]
-extern crate diesel_codegen;
 extern crate readability;
+extern crate serde_json;
+extern crate kafka;
+extern crate url;
 
 use std::cmp;
-use std::ascii::AsciiExt;
+use std::thread;
 
 use time::Timespec;
 use tokio_core::reactor::{Core, Handle};
 use futures::future;
 use futures::{Future, Stream};
 use rss::Channel;
-use uuid::{Uuid, NAMESPACE_X500};
-use diesel::prelude::*;
-use diesel::pg::PgConnection;
+use url::Url;
+use readability::Readability;
+use kafka::consumer::{Consumer, FetchOffset};
+use kafka::producer::{Producer, Record, Partitioner};
 
 use common::logger;
-use common::schema;
-use common::types::{Url, Key};
-use models::{Feed, NewEntry};
+use common::key::Key;
+use common::messages::{Feed, Entry};
 use scheduler::Scheduler;
-use readability::Readability;
 
 mod scheduler;
 mod download;
-mod models;
 
+const KAFKA_URL: &str = "localhost:9092";
 const MIN_INTERVAL: u32 = 3600;
 const MAX_INTERVAL: u32 = 24 * 3600;
 const PROMPTNESS: f32 = 0.5;
@@ -72,23 +69,6 @@ fn purify_text(string: String) -> Option<String> {
     }
 }
 
-fn unify_language(mut language: String) -> Option<String> {
-    if !language.is_ascii() {
-        warn!("Cannot convert \"{}\" to a language code: not ascii", language);
-        return None;
-    }
-
-    if language.len() == 2 {
-        language.make_ascii_lowercase();
-        Some(language)
-    } else if language.len() > 2 {
-        Some(language.trim()[..2].to_lowercase())
-    } else {
-        warn!("Cannot convert \"{}\" to a language code", language);
-        None
-    }
-}
-
 fn parse_rfc822_date(date: &str) -> Option<Timespec> {
     match mailparse::dateparse(date) {
         Ok(date) => Some(Timespec::new(date, 0)),
@@ -110,18 +90,17 @@ fn parse_url(url: &str) -> Option<Url> {
 }
 
 fn fetch_entries(handle: &Handle, mut feed: Feed)
-    -> impl Future<Item=(Feed, Vec<NewEntry>), Error=()>
+    -> impl Future<Item=(Feed, Vec<Entry>), Error=()>
 {
-    info!("Fetching {} feed...", feed.key);
+    info!("Fetching {} feed...", feed.url);
 
     download::channel(handle, &feed.url).then(|channel| {
         Ok(match channel {
             Ok(channel) => disassemble_channel(feed, channel),
             Err(error) => {
-                warn!("Fetching {} is failed: {}", feed.key, error);
+                warn!("Fetching {} is failed: {}", feed.url, error);
 
-                let interval = estimate_interval(feed.interval.unwrap() as u32, 0, 0);
-                feed.interval = Some(interval as i32);
+                feed.interval = estimate_interval(feed.interval, 0, 0);
 
                 (feed, Vec::new())
             }
@@ -129,87 +108,87 @@ fn fetch_entries(handle: &Handle, mut feed: Feed)
     })
 }
 
-fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<NewEntry>) {
-    // TODO: use `channel.ttl` as some assumption about `feed.interval`.
-    feed.title = purify_text(channel.title);
-    feed.description = purify_text(channel.description);
-    feed.language = channel.language.and_then(unify_language);
-    feed.logo = channel.image.and_then(|image| Url::parse(&image.url).ok());
-    feed.copyright = channel.copyright.and_then(purify_text);
-
-    let augmented = feed.augmented.unwrap_or(Timespec::new(0, 0));
-
+fn disassemble_channel(mut feed: Feed, channel: Channel) -> (Feed, Vec<Entry>) {
     let (mut total_count, mut new_count) = (0, 0);
 
+    feed.source = parse_url(&channel.link).unwrap_or(feed.source);
+
     let entries = channel.items.into_iter().filter_map(|item| {
-        let published = item.pub_date.and_then(|date| parse_rfc822_date(&date));
-
-        if let Some(published) = published {
-            total_count += 1;
-
-            if published <= augmented {
+        let url = match item.link.and_then(|url| parse_url(&url)) {
+            Some(url) => url,
+            None => {
+                warn!("Got item without link from {}", feed.url);
                 return None;
             }
-
-            new_count += 1;
-        }
-
-        let url = item.link.and_then(|url| parse_url(&url));
-
-        let key = if let Some(ref url) = url {
-            Key::from(url.clone())
-        } else if let Some(ref title) = item.title {
-            Key::from(Uuid::new_v5(&NAMESPACE_X500, title))
-        } else {
-            return None;
         };
 
-        Some(NewEntry {
-            key,
+        let published = match item.pub_date.and_then(|date| parse_rfc822_date(&date)) {
+            Some(published) => published,
+            None => {
+                warn!("Got item {} without published date from {}", url, feed.url);
+                return None;
+            }
+        };
+
+        let title = match item.title.and_then(purify_text) {
+            Some(title) => title,
+            None => {
+                warn!("Got item {} without title from {}", url, feed.url);
+                return None;
+            }
+        };
+
+        total_count += 1;
+
+        if published <= feed.augmented {
+            return None;
+        }
+
+        new_count += 1;
+
+        let description = item.description.and_then(purify_text);
+        let content = item.content.and_then(purify_text);
+
+        Some(Entry {
             url,
+            title,
             published,
-            feed_id: feed.id,
-            title: item.title.and_then(purify_text),
+            source: feed.source.clone(),
             author: item.author.and_then(purify_text),
-            description: item.description.and_then(purify_text),
-            content: item.content.and_then(purify_text)
+            content: content.or(description).unwrap_or_else(String::new)
         })
     }).collect();
 
-    let interval = estimate_interval(feed.interval.unwrap() as u32, total_count, new_count);
-    feed.interval = Some(interval as i32);
+    // TODO: use `channel.ttl` as some assumption about `feed.interval`.
+    feed.interval = estimate_interval(feed.interval, total_count, new_count);
 
     (feed, entries)
 }
 
-fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
-    -> impl Future<Item=(Feed, Vec<NewEntry>), Error=()> + 'static
+fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<Entry>)
+    -> impl Future<Item=(Feed, Vec<Entry>), Error=()> + 'static
 {
     let fetchers = entries.into_iter().map(|mut entry| {
-        debug!("  Fetching {} entry...", entry.key);
+        debug!("  Fetching {} entry...", entry.url);
 
-        if entry.url.is_none() {
-            return future::ok(Some(entry)).boxed();
-        }
-
-        let download = download::document(handle, entry.url.as_ref().unwrap());
+        let download = download::document(handle, &entry.url);
 
         download.then(|result| {
             let document = match result {
                 Ok(document) => document,
                 Err(error) => {
-                    warn!("Fetching {} is failed: {}", entry.key, error);
+                    warn!("Fetching {} is failed: {}", entry.url, error);
                     return Ok(None);
                 }
             };
 
             // TODO: should we use a thread pool here?
-            let content = Readability::new().parse(&document).to_string();
+            let content = Readability::new().parse(&document).text_contents();
 
             // TODO: leave original `content` in some situations.
-            entry.content = Some(content);
+            entry.content = content;
             Ok(Some(entry))
-        }).boxed()
+        })
     }).collect::<Vec<_>>();
 
     future::join_all(fetchers).map(|entries| {
@@ -218,69 +197,92 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<NewEntry>)
     })
 }
 
-fn save_entries(connection: &PgConnection, feed: &Feed, entries: &[NewEntry]) -> QueryResult<bool> {
-    // TODO: should we use a connection pool here?
-    connection.transaction(|| {
-        let active = diesel::update(feed)
-            .set(feed)
-            .execute(connection)? > 0;
+fn scheduling(scheduler: Scheduler<Feed>) {
+    let mut consumer = Consumer::from_hosts(vec![KAFKA_URL.to_owned()])
+        .with_fallback_offset(FetchOffset::Earliest)
+        .with_topic("feeds".to_owned())
+        .create().unwrap();
 
-        diesel::insert(entries)
-            .into(schema::entry::table)
-            .execute(connection)?;
+    info!("Start scheduling...");
 
-        Ok(active)
-    })
+    loop {
+        for message_set in consumer.poll().unwrap().iter() {
+            for message in message_set.messages() {
+                let feed = match serde_json::from_slice::<Feed>(message.value) {
+                    Ok(feed) => feed,
+                    Err(error) => {
+                        error!("Invalid message on \"feeds\" topic: {}", error);
+                        continue;
+                    }
+                };
+
+                info!("Scheduling {} after {}s...", feed.url, feed.interval);
+                scheduler.schedule(feed.interval as u64 * 1000, feed);
+            }
+
+            consumer.consume_messageset(message_set).unwrap();
+        }
+
+        consumer.commit_consumed().unwrap();
+    }
 }
 
-fn main() {
-    logger::init().unwrap();
+fn send_feed<P>(producer: &mut Producer<P>, feed: Feed)
+    where P: Partitioner
+{
+    let key: String = Key::from(feed.url.clone()).into();
+    let value = serde_json::to_vec(&feed).unwrap();
 
-    let connection = schema::establish_connection().unwrap();
+    producer.send(&Record::from_key_value("feeds", key, value)).unwrap();
+}
 
-    let (scheduler, feed_stream) = Scheduler::new();
+fn send_entries<P>(producer: &mut Producer<P>, entries: Vec<Entry>)
+    where P: Partitioner
+{
+    let records = entries.into_iter()
+        .map(|entry| Record::from_value("entries", serde_json::to_vec(&entry).unwrap()))
+        .collect::<Vec<_>>();
 
-    info!("Loading feeds...");
+    producer.send_all(&records).unwrap();
+}
 
-    let initial_feeds = schema::feed::table.load::<Feed>(&connection).unwrap();
+fn fetching<S>(stream: S)
+    where S: Stream<Item=Feed, Error=()>
+{
+    let mut producer = Producer::from_hosts(vec![KAFKA_URL.to_owned()]).create().unwrap();
 
-    info!("Scheduling initial {} feeds...", initial_feeds.len());
-
-    for mut feed in initial_feeds {
-        let timeout = feed.interval.unwrap_or(0);
-        feed.interval = Some(timeout);
-
-        debug!("  Scheduled {} after {}s", feed.key, timeout);
-
-        scheduler.schedule((timeout * 1000) as u64, feed);
-    }
-
-    info!("Running the reactor...");
+    info!("Start fetching...");
 
     let mut lp = Core::new().unwrap();
     let handle = lp.handle();
 
-    let process = feed_stream
+    let process = stream
         // TODO: should we fetch feeds concurrently?
         .and_then(|feed| fetch_entries(&handle, feed))
         .and_then(|(feed, entries)| fetch_documents(&handle, feed, entries))
         .for_each(|(mut feed, entries)| {
-            info!("Visited {} and collected {} new entries", feed.key, entries.len());
+            info!("Visited {} and collected {} new entries", feed.url, entries.len());
 
-            if let Some(augmented) = entries.iter().filter_map(|entry| entry.published).max() {
-                feed.augmented = Some(augmented);
+            if let Some(augmented) = entries.iter().map(|entry| entry.published).max() {
+                feed.augmented = augmented;
             }
 
-            if save_entries(&connection, &feed, &entries).unwrap() {
-                debug!("  Scheduled after {}s", feed.interval.unwrap());
-
-                scheduler.schedule((feed.interval.unwrap() * 1000) as u64, feed);
-            }
+            send_feed(&mut producer, feed);
+            send_entries(&mut producer, entries);
 
             Ok(())
         });
 
     lp.run(process).unwrap();
+}
+
+fn main() {
+    logger::init().unwrap();
+
+    let (scheduler, stream) = Scheduler::new();
+
+    thread::spawn(move || scheduling(scheduler));
+    fetching(stream);
 }
 
 #[test]

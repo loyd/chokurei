@@ -9,7 +9,7 @@ fi
 
 : ${TARGET:=x86_64-unknown-linux-gnu}
 : ${CHANNEL:=nightly}
-: ${FLAGS:=--features=commit-transaction}
+: ${FLAGS:=}
 : ${MODE:=debug}
 : ${ROLE:=chokurei}
 : ${HOST:=}

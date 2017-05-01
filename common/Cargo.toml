@@ -13,6 +13,6 @@ commit-transaction = []
 log = "^0.3.7"
 env_logger = "^0.4.2"
 time = "^0.1.36"
-uuid = "^0.4"
 url = "^1.4"
-diesel = { version = "^0.12", features = ["postgres", "deprecated-time", "uuid", "unstable"] }
+serde = "^1.0.2"
+serde_derive = "^1.0.2"
