@@ -183,7 +183,7 @@ fn fetch_documents(handle: &Handle, feed: Feed, entries: Vec<Entry>)
             };
 
             // TODO: should we use a thread pool here?
-            let content = Readability::new().parse(&document).to_string();
+            let content = Readability::new().parse(&document).text_contents();
 
             // TODO: leave original `content` in some situations.
             entry.content = content;
