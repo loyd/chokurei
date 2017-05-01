@@ -2,19 +2,18 @@ use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 use std::str;
 use futures::Future;
 use tokio_core::reactor::Handle;
-use tokio_request::str::get;
+use tokio_request::get;
 use rss::Channel;
-
-use common::types::Url;
+use url::Url;
 
 const USER_AGENT: &str = "Mozilla/5.0 (compatible; chokurei)";
 
-// TODO(loyd): share a session between requests.
-// TODO(loyd): what about redirects?
-// TODO(loyd): a bad http status code isn't IO error.
+// TODO: share a session between requests.
+// TODO: what about redirects?
+// TODO: a bad http status code isn't IO error.
 
 pub fn channel(handle: &Handle, url: &Url) -> impl Future<Item=Channel, Error=IoError> + 'static {
-    get(url.as_ref())
+    get(url)
         .header("User-Agent", USER_AGENT)
         .send(handle.clone())
         .and_then(|response| {
@@ -29,7 +28,7 @@ pub fn channel(handle: &Handle, url: &Url) -> impl Future<Item=Channel, Error=Io
 }
 
 pub fn document(handle: &Handle, url: &Url) -> impl Future<Item=String, Error=IoError> + 'static {
-    get(url.as_ref())
+    get(url)
         .header("User-Agent", USER_AGENT)
         .send(handle.clone())
         .and_then(|response| {
