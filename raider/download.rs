@@ -9,7 +9,6 @@ use url::Url;
 const USER_AGENT: &str = "Mozilla/5.0 (compatible; chokurei)";
 
 // TODO: share a session between requests.
-// TODO: what about redirects?
 // TODO: a bad http status code isn't IO error.
 
 pub fn channel(handle: &Handle, url: &Url) -> impl Future<Item=Channel, Error=IoError> + 'static {

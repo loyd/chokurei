@@ -257,6 +257,7 @@ fn fetching<S>(stream: S)
     let handle = lp.handle();
 
     let process = stream
+        // TODO: ideally, in the case of redirect, we should change the url.
         // TODO: should we fetch feeds concurrently?
         .and_then(|feed| fetch_entries(&handle, feed))
         .and_then(|(feed, entries)| fetch_documents(&handle, feed, entries))
