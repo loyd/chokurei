@@ -3,13 +3,12 @@ use url::Url;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Feed {
-    #[serde(with = "url_fmt", default = "unknown_source")]
+    #[serde(with = "url_fmt")]
     pub source: Url,
     #[serde(with = "url_fmt")]
     pub url: Url,
-    #[serde(default)]
     pub interval: u32,
-    #[serde(with = "timespec_fmt", default = "unix_epoch")]
+    #[serde(with = "timespec_fmt")]
     pub augmented: Timespec
 }
 
@@ -55,12 +54,4 @@ mod url_fmt {
 
         Url::parse(&url).map_err(DeError::custom)
     }
-}
-
-pub fn unix_epoch() -> Timespec {
-    Timespec::new(0, 0)
-}
-
-pub fn unknown_source() -> Url {
-    Url::parse("http://unknown").unwrap()
 }

@@ -5,6 +5,12 @@ use url::Url;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Key(String);
 
+impl From<String> for Key {
+    fn from(string: String) -> Key {
+        Key(string)
+    }
+}
+
 impl From<Url> for Key {
     fn from(url: Url) -> Key {
         let host = url.host_str().map(|host| host.trim_left_matches("www."));
