@@ -9,5 +9,6 @@ kafka-topics.sh \
     --partitions 1 \
     --replication-factor 1 \
     --config cleanup.policy=delete \
+    --config compression.type=uncompressed \
     --config retention.ms=$((14 * 24 * 3600 * 1000)) \
     --config max.message.bytes=$((1 * 1024 * 1024))
