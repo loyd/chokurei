@@ -2,8 +2,8 @@
 
 set -e
 
-if [ "$1" != 'fetcher' ]; then
-    echo "Usage: $0 fetcher <command>"
+if [ "$1" != 'raider' ]; then
+    echo "Usage: $0 raider <command>"
     exit 1
 fi
 

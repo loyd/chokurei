@@ -1,10 +1,10 @@
 [package]
-name = "fetcher"
+name = "raider"
 version = "0.0.0"
 publish = false
 
 [[bin]]
-name = "fetcher"
+name = "raider"
 path = "main.rs"
 
 [dependencies]
