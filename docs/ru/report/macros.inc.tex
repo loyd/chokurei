@@ -1,0 +1,7 @@
+\newenvironment{conditions}[1][где]
+    {#1 \begin{tabular}[t]{l @{~--- } l}}
+    {\end{tabular}\\[\belowdisplayskip]}
+
+\newenvironment{definition}[1]
+    {\noindent#1\begin{adjustwidth}{.5\parindent}{}\noindent\ignorespaces}
+    {\end{adjustwidth}}
