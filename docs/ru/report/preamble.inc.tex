@@ -36,3 +36,8 @@
 % Центрирование подписей.
 \usepackage[justification=centering]{caption}
 \usepackage{subcaption}
+
+\usepackage{totcount}
+\newtotcounter{citnum}
+\def\oldbibitem{} \let\oldbibitem=\bibitem
+\def\bibitem{\stepcounter{citnum}\oldbibitem}
