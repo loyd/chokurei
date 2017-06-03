@@ -290,61 +290,106 @@
   \if@usepscyr
     \RequirePackage[math]{pscyr}
   \fi
+  % аналоги команд из XeLaTeX
+  \def\cyrillicfonttt{\fontfamily{\ttdefault}\selectfont}
+  \def\cyrillicfont{\fontfamily{\rmdefault}\selectfont}
+  \def\cyrillicfontsf{\fontfamily{\sfdefault}\selectfont}
 \else
   % breaks
 %   \RequirePackage{unicode-math}
+
+   % проверка наличия шрифта в системе
+   \def\IfNoFont#1#2#3{
+   \count255=\interactionmode
+   \suppressfontnotfounderror1
+   \batchmode
+   \def\myfont{#1}
+   \font\foo="\myfont"\space at 10pt
+   \interactionmode=\count255
+   \ifx\foo\nullfont#2\else#3\fi
+   }
 
   \RequirePackage{fontspec}
   \RequirePackage{xecyr}
    %\RequirePackage{xunicode}
    %\RequirePackage{xltxtra}
   \RequirePackage{polyglossia}
-  \setdefaultlanguage{russian}
   \setotherlanguage{english}
-  \defaultfontfeatures{Mapping=tex-text}
-  %\setmainfont{CMU Serif}
-  \setromanfont[
-      BoldFont = cmunbx.otf,
-      ItalicFont = cmunti.otf,
-  BoldItalicFont = cmunbi.otf]
-  {cmunrm.otf}
+  \defaultfontfeatures{Ligatures=TeX, Mapping=tex-text} % стандартные лигатуры TeX, замены нескольких дефисов на тире и т. п.
+  \setmainlanguage[babelshorthands=true]{russian} % Язык по-умолчанию русский с поддержкой приятных команд пакета babel
 
-  \setsansfont[
-      BoldFont = cmunsx.otf,
-      ItalicFont = cmunsi.otf,
-  BoldItalicFont = cmunso.otf]
-  {cmunss.otf}
+  % Основной шрифт
+  \IfNoFont{PT Astra Serif}{
+    \setmainfont[
+    BoldFont = cmunbx.otf,
+    ItalicFont = cmunti.otf,
+    BoldItalicFont = cmunbi.otf]
+    {cmunrm.otf}
+    \newfontfamily\cyrillicfont{cmunrm.otf}[ % для кириллицы
+    BoldFont = cmunbx.otf,
+    ItalicFont = cmunti.otf,
+    BoldItalicFont = cmunbi.otf]
+  }{
+    \setmainfont{PT Astra Serif}
+    \newfontfamily\cyrillicfont{PT Astra Serif}[Script = Cyrillic] % для кириллицы
+  }
 
-  \setmonofont[
-      BoldFont = cmuntb.otf,
-      ItalicFont = cmunit.otf,
-  BoldItalicFont = cmuntx.otf]
-  {cmuntt.otf}
-  %\setmainfont{cmunrm.ttf}
-  %\setsansfont{cmunss.ttf}
-  %\setmonofont{cmuntt.ttf}
-  %\setmainfont{GOST_type_A} % Ставим как основной шрифт
-  %\setsansfont{GOST_type_A}
-  %\setmonofont{GOST_type_A}
+  % Шрифт без засечек
+  \IfNoFont{PT Astra Sans}{
+    \setsansfont[
+    BoldFont = cmunsx.otf,
+    ItalicFont = cmunsi.otf,
+    BoldItalicFont = cmunso.otf]
+    {cmunss.otf}
+    \newfontfamily{\cyrillicfontsf}{cmunss.otf}[ % для кириллицы
+    BoldFont = cmunsx.otf,
+    ItalicFont = cmunsi.otf,
+    BoldItalicFont = cmunso.otf]
+  }{
+    \setsansfont{PT Astra Sans}
+    \newfontfamily\cyrillicfontsf{PT Astra Sans}[Script = Cyrillic] % для кириллицы
+  }
 
-  \newfontfamily{\cyrillicfont}{cmunrm.otf}[
-      BoldFont = cmunbx.otf,
-      ItalicFont = cmunti.otf,
-  BoldItalicFont = cmunbi.otf]
-  \newfontfamily{\cyrillicfontt}{cmunrm.otf}[
-      BoldFont = cmunsx.otf,
-      ItalicFont = cmunsi.otf,
-  BoldItalicFont = cmunso.otf]
-  \newfontfamily{\cyrillicfonttt}{cmunrm.otf}[
-      BoldFont = cmuntb.otf,
-      ItalicFont = cmunit.otf,
-  BoldItalicFont = cmuntx.otf]
+  % Моноширинный шрифт
+  \IfNoFont{Liberation Mono}{
+    \setmonofont[
+    BoldFont = cmuntb.otf,
+    ItalicFont = cmunit.otf,
+    BoldItalicFont = cmuntx.otf]
+    {cmuntt.otf}
+    \newfontfamily{\cyrillicfonttt}{cmunrm.otf}[ % для кириллицы
+    BoldFont = cmuntb.otf,
+    ItalicFont = cmunit.otf,
+    BoldItalicFont = cmuntx.otf]
+    % Шрифт для minted
+    \defaultfontfeatures{}
+    \newfontfamily\cyrillicfontttnoftr{cmunrm.otf}[
+    NFSSFamily = cyrillicfontttnoftr,
+    BoldFont = cmuntb.otf,
+    ItalicFont = cmunit.otf,
+    BoldItalicFont = cmuntx.otf]
+  }{
+    \setmonofont{Liberation Mono}
+    \newfontfamily\cyrillicfonttt{Liberation Mono}[Script = Cyrillic] % для кириллицы
+    % Шрифт для minted
+    \defaultfontfeatures{}
+    \newfontfamily\cyrillicfontttnoftr{Liberation Mono}[
+    Script = Cyrillic,
+    NFSSFamily = cyrillicfontttnoftr
+    ]
+  }
+
   % убирает точку после названий секций
   \addto\russian@capsformat{
 	\def\postchapter{\@aftersepkern}
 	\def\postsection{\@aftersepkern}
 	\def\postsubsection{\@aftersepkern}
 	\def\postsubsubsection{\@aftersepkern}
+  }
+
+  \usepackage{trimclip}
+  \def\cyrdash{%
+    \clipbox{0pt}{\hbox to .8em{---\hss}}%
   }
 \fi
 \RequirePackage{flafter}
@@ -386,7 +431,7 @@
 \addtolength\GostItemNestedIndent{6mm}
 
 %  ненумерованные перечисления
-\newcommand{\labelitemi}{---}
+\newcommand{\labelitemi}{\cdash---}
 
 %  нумерованные перечисления
 \renewcommand\theenumi {\asbuk{enumi}}
@@ -409,7 +454,7 @@
 }{%
  \endlist%
 }
-\newcommand*\abbreviationlabel[1]{\hspace\labelsep #1~---}% убран \normalfont
+\newcommand*\abbreviationlabel[1]{\hspace\labelsep #1 \cdash---}% убран \normalfont
 
 % 4.2.15 - 4.2.19 Формулы
 
@@ -472,7 +517,7 @@
 \RequirePackage[normal,nooneline]{caption}
 
 % Длинное тире в качестве разделителя
-\DeclareCaptionLabelSeparator*{emdash}{\space\textemdash\space}
+\DeclareCaptionLabelSeparator*{emdash}{\space\cdash---\space}
 
 % Между подписью и рисунком 10pt
 \captionsetup{labelsep=emdash,aboveskip=10pt,belowskip=0pt,position=bottom}
@@ -689,3 +734,34 @@
  }
  \makeatother
 }
+
+%Чтобы избежать переопределения \cyrdash в bbl файле
+\def\FixBibliographyCyrdash{
+  \let\Gost@old@thebibliography\thebibliography
+  \renewenvironment{thebibliography}[1]{%
+    \let\Gost@old@ProvideTextCommandDefault\ProvideTextCommandDefault%
+    \let\ProvideTextCommandDefault\@gobbletwo%
+    \begin{Gost@old@thebibliography}{##1}%
+  }{
+    \end{Gost@old@thebibliography}%
+    \let\ProvideTextCommandDefault\Gost@old@ProvideTextCommandDefault%
+  }
+}
+
+\newcommand\MakeDashesBold{
+  \usepackage{trimclip}
+  \makeatletter
+  \let\Gost@old@cyrdash\cyrdash
+  \def\cyrdash{%
+    \ifdim\f@size pt>13pt%
+       \clipbox{0pt}{\hbox to .8em{\textbf{\Gost@old@cyrdash\hss}}}%
+    \else%
+       \Gost@old@cyrdash%
+    \fi%
+  }
+  \FixBibliographyCyrdash
+  \makeatother
+}
+\ifXeTeX
+\FixBibliographyCyrdash
+\fi

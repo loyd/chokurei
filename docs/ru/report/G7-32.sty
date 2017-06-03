@@ -20,7 +20,7 @@
 % ГОСТ 7.32-2001 ред. 2009 года.pdf item 6.1.2:
 % Полужирный шрифт не применяется
 % (TODO: Perhaps, bold titles could be a package option.)
-\renewcommand\GostTitleStyle{\normalfont}
+%\renewcommand\GostTitleStyle{\normalfont}
 
 % ГОСТ 7.32-2001 ред. 2009 года.pdf item 6.2.1:
 % Заголовки структурных элементов следует располагать в середине
@@ -157,11 +157,11 @@
   \parbox[t]{.3\linewidth}{
     \vspace{-5ex}\center{\includegraphics[width=.99\linewidth]{logo}}\\
   }
-  {\textsc{\Nir@OrgLongName}}
+  {\MakeUppercase{\Nir@OrgLongName}}
   \end{flushleft}
   }{
   \begin{center}
-  {\textsc{\Nir@OrgLongName}}
+  {\MakeUppercase{\Nir@OrgLongName}}
   \end{center}
   }
  \begin{centering}
@@ -271,6 +271,7 @@
 \newcommand*\NirTown[1]{\newcommand\Nir@Town{#1}}%%virens added: указываем город написания отчёта
 \newcommand*\NirUdk[1]{\renewcommand\Nir@UdkName{#1}}%%virens added: для изменения УДК в тексте документа
 \newcommand*\NirGosNo[1]{\renewcommand\Nir@No{#1}}%%virens added: номер госрегистрации
+\newcommand*\NirInventarNo[1]{\renewcommand\Nir@InventarNo{#1}}
 
 %%%%%%%%%%%%%%%%%%%%%%%
 % Compatibility macros
@@ -354,21 +355,21 @@
 \def\three@digits#1{\ifnum#1>99\else\ifnum#1>9 0\else00\fi\fi\number#1}
 
 \newcounter{abbrev}%
-\newcommand{\Define}[2]{\nomenclature[A]{#1}{#2.}}%
+\newcommand{\Define}[2]{\nomenclature[X]{#1}{#2.}}%
 \newcommand{\Abbrev}[2]{%
     \addtocounter{abbrev}{1}%
-    \nomenclature[D{\three@digits{\value{abbrev}}}]{#1}{#2.}%
+    \nomenclature[Y{\three@digits{\value{abbrev}}}]{#1}{#2.}%
 }%
 
 \renewcommand\nomname{}%
 \renewcommand\nomgroup[1]{%
-    \if#1D%
-        \Abbreviations%
-    \else%
+    \if#1X%
         \Defines%
+    \else%
+        \Abbreviations%
     \fi%
 }%
-\renewcommand\nomlabel[1]{#1~---}%
+\renewcommand\nomlabel[1]{#1 \cdash---\kern-0.4em}%
 \renewcommand\thenomenclature{%
     \list{}{%
         \let\makelabel\nomlabel%
