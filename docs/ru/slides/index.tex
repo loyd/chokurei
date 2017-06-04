@@ -3,7 +3,7 @@
 \include{preamble.inc}
 \include{macros.inc}
 
-\title{Метод ранжирования информационных источников по степени доверия}
+\title[]{Метод ранжирования информационных источников по степени доверия}
 \author[Павелко Павел Юрьевич]{Выполнил: Павелко Павел Юрьевич, ИУ7-81 \\ Руководитель: Бекасов Денис Евгеньевич, ИУ7}
 \institute[]{МГТУ им. Баумана}
 \date{Москва, \the\year}
@@ -22,9 +22,9 @@
     \begin{block}{Задачи}
         \begin{enumerate}
             \item Проанализировать предметную область
-            \item Разработать метод ранжирование источников
+            \item Разработать метод ранжирования источников
             \item Разработать программное обеспечение
-            \item Исследовать применимость метода
+            \item Провести исследование для выбора параметров метода
         \end{enumerate}
     \end{block}
 \end{frame}
@@ -82,19 +82,17 @@
 
     \begin{block}{Readability Algorithm}
         \begin{enumerate}
-            \item Оценка узлов DOM-дерева по различным показателям
-            \item Ранжирование узлов по оценке
-            \item Извлечение текстового содержимое наиболее значимых узлов
+            \item Оценка узлов DOM-дерева по различным показателям:
+                \begin{enumerate}
+                    \item Длина текста и доля ссылок в тексте
+                    \item Количество запятых в тексте
+                    \item Доля изображений, списков и т.д.
+                    \item Классы, идентификаторы и теги
+                \end{enumerate}
+            \item Ранжирование узлов по данной оценке
+            \item Объединение наиболее значимых узлов
+            \item Извлечение текстового содержимого
         \end{enumerate}
-    \end{block}
-
-    \begin{block}{Основные показатели}
-        \begin{itemize}
-            \item Длина текста и доля ссылок в тексте
-            \item Количество запятых в тексте
-            \item Доля изображений, списков и т.д.
-            \item Классы, идентификаторы и теги
-        \end{itemize}
     \end{block}
 \end{frame}
 
@@ -110,21 +108,23 @@
     \frametitle{Выбор алгоритма кластеризации}
 
     \begin{block}{}
-        \begin{center}
-            \begin{tabular}{ l | l | l | l | >{\columncolor[gray]{0.8}} l }
+        \begin{center}\small
+            \begin{tabular}{ l | c | c | c | c | >{\columncolor[gray]{0.7}} c }
                 \hline
-                & k-m & HAC & DHCA & ICA \\ \hline
-                Адаптивное кол-во кластеров & $-$ & $+$ & $+$ & $+$ \\ \hline
-                Иерархические кластеры & $-$ & $+$ & $+$ & $-$ \\ \hline
-                Онлайновый алгоритм & $-$ & $-$ & $+$ & $+$ \\ \hline
-                Возможность оптимизаций & $-$ & $-$ & $-$ & $+$ \\
+                & k-ср. & разд. k-ср. &  HAC & DHCA & ICA \\ \hline\hline
+                Адаптивное кол-во класт. & $-$ & $+$ & $+$ & $+$ & $+$ \\ \hline
+                Иерархические кластеры   & $-$ & $+$ & $+$ & $+$ & $-$ \\ \hline
+                Онлайновый алгоритм      & $-$ & $-$ & $-$ & $+$ & $+$ \\ \hline
+                Возможность оптимизаций  & $+$ & $-$ & $-$ & $-$ & $+$ \\
                 \hline
             \end{tabular}
         \end{center}
     \end{block}
 
     \begin{block}{Алгоритмы}
-            k-m~--- K-means
+            k-ср~--- метод K-средних
+
+            разд. k-ср~--- разделяющий метод k-средних
 
             HAC~--- Hierarchical Agglomerative Clustering
 
@@ -157,7 +157,7 @@
             \end{conditions}
 
             \[
-                sim(\mathbf{x},\mathbf{y})=\mathbf{x}\mathbf{y}\cdot(1-penalty(x,y))
+                sim(\mathbf{x},\mathbf{y})=\mathbf{x}\mathbf{y}\cdot(1-\text{штраф}(x,y))
             \]
         \end{column}
     \end{columns}
@@ -173,17 +173,55 @@
 \end{frame}
 
 \begin{frame}
-    \frametitle{Исследование влияния выбора меры сходства на качество кластеризации}
+    \frametitle{Исследование влияния меры сходства на качество кластеризации}
 
-    \begin{block}{}
-        TODO
-
-        \begin{enumerate}
-            \item постановка
-            \item цель
-            \item размер выборки
-        \end{enumerate}
+    \begin{block}{Цель эксперимента}
+        Оценить влияние на качество кластеризации меры схожести
     \end{block}
+
+    \begin{block}{Набор данных}
+        2005 новостей и 263 кластера от агрегатора <<Яндекс.Новости>>
+    \end{block}
+
+    \begin{block}{Метрика качества}
+        \[
+            F=\sum_{o\in O}\frac{|o|}{n}\max_{c\in C}F_1(c,o) \text{, где} \quad
+            F_1(c,o)=\frac{2\cdot P(c,o)\cdot R(c,o)}{P(c,o)+R(c,o)}
+        \]
+    \end{block}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Исследование влияния меры сходства на качество кластеризации}
+
+    \begin{table}
+        \begin{center}\small
+            \begin{tabular}{l l | c}
+                \hline
+                Мера схожести & & F-метрика \\ \hline\hline
+                Эвклидово расстояние &
+                $d(\vect{x},\vect{y})=\sqrt{\sum_{i=1}^n(x_i-y_i)^2}$
+                & 0.89 \\ \hline
+                Косинусная мера &
+                $sim_c(\vect{x},\vect{y})=\frac{\vect{x}\cdot\vect{y}}{\lVert\vect{x}\rVert\lVert\vect{y}\rVert}$
+                & 0.92 \\ \hline
+                Мера Жаккара &
+                $sim_j(\vect{x},\vect{y})=\frac{\vect{x}\cdot\vect{y}}{\lVert\vect{x}\rVert^2 + \lVert\vect{y}\rVert^2-\vect{x}\cdot\vect{y}}$
+                & 0.91 \\ \hline
+                Эвклидово расстояние со штрaф. &
+                $d(\vect{x},\vect{y})\cdot(1+penalty(x,y))$
+                & 0.89 \\ \hline
+                \rowcolor[gray]{0.7}
+                Косинусная мера со штрафами &
+                $sim_c(\vect{x},\vect{y})\cdot(1-penalty(x,y))$
+                & 0.93 \\ \hline
+                Мера Жаккара со штрафами &
+                $sim_j(\vect{x},\vect{y})\cdot(1-penalty(x,y))$
+                & 0.92 \\
+                \hline
+            \end{tabular}
+        \end{center}
+    \end{table}
 \end{frame}
 
 \begin{frame}
@@ -194,7 +232,7 @@
             \item Проанализирована предметная область
             \item Разработан метод ранжирования источников
             \item Разработано программное обеспечение
-            \item Исследована применимость метода
+            \item Исследовано влияние меры схожести на качество кластеризации
         \end{enumerate}
     \end{block}
 \end{frame}
