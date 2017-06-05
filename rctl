@@ -3,9 +3,9 @@
 set -e
 
 case "$1" in
-    scout|raider) ;;
+    scout|raider|compounder) ;;
     *)
-        echo "Usage: $0 <scout|raider> <command>"
+        echo "Usage: $0 <scout|raider|compounder> <command>"
         exit 1
         ;;
 esac
